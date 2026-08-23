@@ -261,7 +261,13 @@ interface LmStudioModels {
     type?: string;
     max_context_length?: number;
     capabilities?: { vision?: boolean; reasoning?: unknown };
-    loaded_instances?: unknown[];
+    // Each loaded instance carries its own runtime-configured context length
+    // (config.context_length), which can be far smaller than the model's
+    // architectural ceiling (max_context_length) — e.g. a model with a 262144
+    // trained max loaded with only a 4096 context. Prefer the loaded
+    // instance's context_length when present; it reflects what the server
+    // will actually serve.
+    loaded_instances?: Array<{ config?: { context_length?: number } }>;
     size_bytes?: number;
     quantization?: { name: string };
   }>;
@@ -280,7 +286,10 @@ export async function detectLmStudio(
   for (const m of res.models) {
     const type = (m.type ?? "").toLowerCase();
     if (type !== "llm" && type !== "vlm") continue;
-    const contextWindow = m.max_context_length ?? 32768;
+    const loadedContextLength = m.loaded_instances?.find(
+      (inst) => typeof inst.config?.context_length === "number",
+    )?.config?.context_length;
+    const contextWindow = loadedContextLength ?? m.max_context_length ?? 32768;
     models.push({
       id: m.key,
       name: m.display_name || m.key,

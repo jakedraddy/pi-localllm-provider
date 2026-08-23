@@ -285,6 +285,40 @@ describe("detectLmStudio", () => {
     const result = await detectLmStudio("http://x", "");
     expect(result?.models[0].loaded).toBe(false);
   });
+
+  it("prefers the loaded instance's configured context_length over max_context_length", async () => {
+    mockFetch({
+      "http://x/api/v1/models": {
+        models: [
+          {
+            key: "k1",
+            type: "llm",
+            max_context_length: 262144,
+            loaded_instances: [{ id: "k1", config: { context_length: 4096 } }],
+          },
+        ],
+      },
+    });
+    const result = await detectLmStudio("http://x", "");
+    expect(result?.models[0].contextWindow).toBe(4096);
+  });
+
+  it("falls back to max_context_length when no loaded instance reports a context_length", async () => {
+    mockFetch({
+      "http://x/api/v1/models": {
+        models: [
+          {
+            key: "k1",
+            type: "llm",
+            max_context_length: 262144,
+            loaded_instances: [{ id: "k1", config: {} }],
+          },
+        ],
+      },
+    });
+    const result = await detectLmStudio("http://x", "");
+    expect(result?.models[0].contextWindow).toBe(262144);
+  });
 });
 
 describe("detectLlamaCpp", () => {
